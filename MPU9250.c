@@ -92,6 +92,9 @@ const uint8_t AK8963_ASA = 0x10;
 const uint8_t AK8963_WHO_AM_I = 0x00;
 
 
+static uint8_t _buffer[21];
+static uint8_t _mag_adjust[3];
+
 __weak void MPU9250_OnActivate()
 {
 }
@@ -189,8 +192,6 @@ void readAK8963Registers(uint8_t subAddress, uint8_t count, uint8_t* dest)
 	readRegisters(EXT_SENS_DATA_00,count,dest);
 }
 
-uint8_t _buffer[21];
-
 /* gets the MPU9250 WHO_AM_I register value, expected to be 0x71 */
 static uint8_t whoAmI(){
 	// read the WHO AM I register
@@ -279,7 +280,7 @@ uint8_t MPU9250_Init()
 	HAL_Delay(100);
 
 	// read the AK8963 ASA registers and compute magnetometer scale factors
-	readAK8963Registers(AK8963_ASA,3,_buffer);
+	readAK8963Registers(AK8963_ASA, 3, _mag_adjust);
 
 	// set AK8963 to Power Down
 	writeAK8963Register(AK8963_CNTL1,AK8963_PWR_DOWN);
@@ -378,7 +379,12 @@ void MPU9250_GetData(int16_t* AccData, int16_t* MagData, int16_t* GyroData)
 	GyroData[0] = (((int16_t)_buffer[8]) << 8) | _buffer[9];
 	GyroData[1] = (((int16_t)_buffer[10]) << 8) | _buffer[11];
 	GyroData[2] = (((int16_t)_buffer[12]) << 8) | _buffer[13];
-	MagData[0] = (((int16_t)_buffer[15]) << 8) | _buffer[14];
-	MagData[1] = (((int16_t)_buffer[17]) << 8) | _buffer[16];
-	MagData[2] = (((int16_t)_buffer[19]) << 8) | _buffer[18];
+
+	int16_t magx = (((int16_t)_buffer[15]) << 8) | _buffer[14];
+	int16_t magy = (((int16_t)_buffer[17]) << 8) | _buffer[16];
+	int16_t magz = (((int16_t)_buffer[19]) << 8) | _buffer[18];
+
+	MagData[0] = (int16_t)((float)magx * ((float)(_mag_adjust[0] - 128) / 256.0f + 1.0f));
+	MagData[1] = (int16_t)((float)magy * ((float)(_mag_adjust[1] - 128) / 256.0f + 1.0f));
+	MagData[2] = (int16_t)((float)magz * ((float)(_mag_adjust[2] - 128) / 256.0f + 1.0f));
 }
